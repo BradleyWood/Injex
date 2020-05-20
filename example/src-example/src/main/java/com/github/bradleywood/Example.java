@@ -21,6 +21,16 @@ public class Example {
         return a + b;
     }
 
+    @Copy("copyMe")
+    public static double copy$copyMe() {
+        throw new RuntimeException();
+    }
+
+    @Replace("copyMe")
+    public static double replacement() {
+        return copy$copyMe() + 10;
+    }
+
     @HookAfter("hookAfterMe")
     public static int mathHook(int a, int b) {
         System.out.println("Math function hooked");
@@ -33,7 +43,7 @@ public class Example {
 
     @Inject
     public void injectThis() {
-        System.out.println("We have been injected");
+        System.out.println("We have been injected: " + mathHook(50, 25));
     }
 
 }

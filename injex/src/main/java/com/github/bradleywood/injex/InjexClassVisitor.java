@@ -96,7 +96,7 @@ public class InjexClassVisitor extends ClassVisitor {
         final List<InjexMethod> methods = new LinkedList<>();
 
         for (InjexMethod method : src.getMethods()) {
-            if (method.getName().equals(name) && method.getDesc().equals(desc))
+            if (method.getName().equals(name) && method.getDesc().equals(desc) && method.getType() != AlterationType.COPY)
                 methods.add(method);
         }
 

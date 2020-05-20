@@ -8,6 +8,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
+import java.util.Objects;
+
 public class InjexMethodVisitor extends MethodVisitor {
 
     private final InjexMethod method;
@@ -40,8 +42,13 @@ public class InjexMethodVisitor extends MethodVisitor {
         }
     }
 
-    private void ret() {
+    @Override
+    public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+        if (method != null && Objects.equals(owner, method.getSrcClass())) {
+            owner = name;
+        }
 
+        super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
     }
 
     @Override
