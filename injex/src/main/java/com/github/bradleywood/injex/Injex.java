@@ -42,21 +42,34 @@ public class Injex {
 
 
         final Map<ClassInfo, ClassReader> pairs = pairClasses(readers, targetReaders);
+        final List<ClassInfo> replacementTypes = getReplacementTypes(readers);
         final ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(outputJar));
 
         pairs.forEach((clazz, reader) -> {
             final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-            final InjexClassVisitor injexVisitor = new InjexClassVisitor(clazz, writer, reader.getClassName());
+            final InjexClassVisitor injexVisitor = new InjexClassVisitor(replacementTypes, clazz, writer, reader.getClassName());
+
             reader.accept(injexVisitor, 0);
 
             try {
-                zos.putNextEntry(new ZipEntry(reader.getClassName() + ".class"));
-                zos.write(writer.toByteArray());
-                zos.closeEntry();
+                if (!clazz.isReplaceInstantiation()) {
+                    zos.putNextEntry(new ZipEntry(reader.getClassName() + ".class"));
+                    zos.write(writer.toByteArray());
+                    zos.closeEntry();
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
         });
+
+        for (ClassInfo replacementType : replacementTypes) {
+            final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+            replacementType.getReader().accept(writer, 0);
+
+            zos.putNextEntry(new ZipEntry(replacementType.getName()+ ".class"));
+            zos.write(writer.toByteArray());
+            zos.closeEntry();
+        }
 
         fileEntries.forEach((name, in) -> {
             try {
@@ -80,6 +93,10 @@ public class Injex {
         }
     }
 
+    private static List<ClassInfo> getReplacementTypes(final List<ClassInfo> srcReaders) {
+        return srcReaders.stream().filter(ClassInfo::isReplaceInstantiation).collect(Collectors.toList());
+    }
+
     private static Map<ClassInfo, ClassReader> pairClasses(final List<ClassInfo> srcReaders, List<ClassReader> targetReaders) {
         final Map<ClassInfo, ClassReader> pairs = new HashMap<>();
 
@@ -94,12 +111,6 @@ public class Injex {
         }
 
         return pairs;
-    }
-
-    private static List<Class<?>> loadClasses(final File file) throws IOException {
-        final Map<String, InputStream> inputStreamsMap = getClassEntries(file);
-        final InjexClassLoader injexClassLoader = new InjexClassLoader(Injex.class.getClassLoader(), inputStreamsMap);
-        return injexClassLoader.loadClasses();
     }
 
     private static Map<String, InputStream> getClassEntries(final File file) throws IOException {

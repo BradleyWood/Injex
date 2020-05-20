@@ -1,6 +1,8 @@
 package com.github.bradleywood.injex.info;
 
 
+import com.github.bradleywood.injex.annotations.InjexTarget;
+import com.github.bradleywood.injex.annotations.ReplaceInstantiation;
 import lombok.Getter;
 import org.objectweb.asm.*;
 
@@ -25,7 +27,19 @@ public class ClassInfoVisitor extends ClassVisitor {
 
     @Override
     public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-        return new AnnotationInfoVisitor(info);
+        final Type descType = Type.getType(descriptor);
+
+        if (Type.getType(ReplaceInstantiation.class).equals(descType) || Type.getType(InjexTarget.class).equals(descType)) {
+            if (info.getTarget() != null)
+                throw new RuntimeException("Class can be annotated with either ReplaceInstantiation or InjexTarget");
+
+            if (Type.getType(ReplaceInstantiation.class).equals(descType))
+                info.setReplaceInstantiation(true);
+
+            return new AnnotationInfoVisitor(info);
+        }
+
+        return null;
     }
 
     @Override

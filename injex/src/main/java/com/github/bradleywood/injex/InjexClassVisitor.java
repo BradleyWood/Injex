@@ -14,20 +14,22 @@ import static com.github.bradleywood.injex.InjexMethodVisitor.invokeHook;
 
 public class InjexClassVisitor extends ClassVisitor {
 
+    private final List<ClassInfo> replacementTypes;
     private final ClassInfo src;
     private final String name;
 
     private boolean done = false;
 
-    public InjexClassVisitor(final ClassInfo src, final ClassVisitor classVisitor, final String name) {
+    public InjexClassVisitor(final List<ClassInfo> replacementTypes, final ClassInfo src, final ClassVisitor classVisitor, final String name) {
         super(Opcodes.ASM8, classVisitor);
 
+        this.replacementTypes = replacementTypes;
         this.src = src;
         this.name = name;
     }
 
-    public InjexClassVisitor(final ClassInfo src, String name) {
-        this(src, null, name);
+    public InjexClassVisitor(final List<ClassInfo> replacementTypes, final ClassInfo src, String name) {
+        this(replacementTypes, src, null, name);
     }
 
     @Override
@@ -49,11 +51,10 @@ public class InjexClassVisitor extends ClassVisitor {
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-
         if (!done) {
-            final List<InjexMethod> replacements = getTargets(name, descriptor, AlterationType.REPLACE);
+            final List<InjexMethod> replacements = getSourceMethods(name, descriptor, AlterationType.REPLACE);
 
-            for (InjexMethod target : getTargets(name, descriptor, AlterationType.COPY)) {
+            for (InjexMethod target : getSourceMethods(name, descriptor, AlterationType.COPY)) {
                 super.visitMethod(access, target.getName(), descriptor, signature, exceptions);
             }
 
@@ -65,7 +66,7 @@ public class InjexClassVisitor extends ClassVisitor {
         } else if (!shouldInject(name, descriptor))
             return null;
 
-        final List<InjexMethod> replacements = getTargets(name, descriptor, AlterationType.REPLACE);
+        final List<InjexMethod> replacements = getSourceMethods(name, descriptor, AlterationType.REPLACE);
 
         if (!replacements.isEmpty() && replacements.size() > 1) {
             throw new RuntimeException("Cannot replace method more than once");
@@ -86,26 +87,14 @@ public class InjexClassVisitor extends ClassVisitor {
             invokeHook(mv, target, this.name);
         }
 
-        return new InjexMethodVisitor(target, mv, this.name);
-    }
-
-    private List<InjexMethod> getAlterationsByType(List<InjexMethod> methods, AlterationType alterationType) {
-        final List<InjexMethod> result = new LinkedList<>();
-
-        for (InjexMethod method : methods) {
-            if (method.getType() == alterationType) {
-                result.add(method);
-            }
-        }
-
-        return result;
+        return new InjexMethodVisitor(replacementTypes, target, mv, this.name);
     }
 
     private boolean shouldInject(String name, String desc) {
-        return getTargets(name, desc).size() > 0;
+        return getSourceMethods(name, desc).size() > 0;
     }
 
-    private List<InjexMethod> getTargets(String name, String desc) {
+    private List<InjexMethod> getSourceMethods(String name, String desc) {
         final List<InjexMethod> methods = new LinkedList<>();
 
         for (InjexMethod method : src.getMethods()) {
@@ -125,7 +114,7 @@ public class InjexClassVisitor extends ClassVisitor {
         return null;
     }
 
-    private List<InjexMethod> getTargets(final String name, String desc, AlterationType type) {
-        return getTargets(name, desc).stream().filter(m -> m.getType() == type).collect(Collectors.toList());
+    private List<InjexMethod> getSourceMethods(final String name, String desc, AlterationType type) {
+        return getSourceMethods(name, desc).stream().filter(m -> m.getType() == type).collect(Collectors.toList());
     }
 }

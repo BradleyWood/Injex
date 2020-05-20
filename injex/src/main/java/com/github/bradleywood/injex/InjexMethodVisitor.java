@@ -2,24 +2,50 @@ package com.github.bradleywood.injex;
 
 import com.github.bradleywood.injex.annotations.*;
 import com.github.bradleywood.injex.info.AlterationType;
+import com.github.bradleywood.injex.info.ClassInfo;
 import com.github.bradleywood.injex.info.InjexMethod;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
+import java.util.List;
 import java.util.Objects;
 
 public class InjexMethodVisitor extends MethodVisitor {
 
+    private final List<ClassInfo> replacementTypes;
     private final InjexMethod method;
     private final String owner;
 
-    public InjexMethodVisitor(final InjexMethod method, final MethodVisitor mv, final String owner) {
+    public InjexMethodVisitor(final List<ClassInfo> replacementTypes, final InjexMethod method, final MethodVisitor mv,
+                              final String owner) {
         super(Opcodes.ASM8, mv);
 
+        this.replacementTypes = replacementTypes;
         this.method = method;
         this.owner = owner;
+    }
+
+    @Override
+    public void visitTypeInsn(int opcode, String type) {
+        final ClassInfo replacementType = getReplacementType(type);
+
+        if (replacementType != null) {
+            super.visitTypeInsn(opcode, replacementType.getName());
+        } else {
+            super.visitTypeInsn(opcode, type);
+        }
+    }
+
+    private ClassInfo getReplacementType(String type) {
+        for (final ClassInfo replacementType : replacementTypes) {
+            if (Objects.equals(type, replacementType.getTarget())) {
+                return replacementType;
+            }
+        }
+
+        return null;
     }
 
     @Override
@@ -48,7 +74,17 @@ public class InjexMethodVisitor extends MethodVisitor {
             owner = name;
         }
 
+        final ClassInfo replacementType = getReplacementType(owner);
+
+        if (replacementType != null && opcode == Opcodes.INVOKESPECIAL) {
+            owner = replacementType.getName();
+        }
+
         super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+
+        if (replacementType != null && opcode == Opcodes.INVOKESPECIAL) {
+            mv.visitTypeInsn(Opcodes.CHECKCAST, owner);
+        }
     }
 
     @Override
@@ -69,10 +105,6 @@ public class InjexMethodVisitor extends MethodVisitor {
         int insn = (target.getAccess() & Opcodes.ACC_STATIC) != 0 ? Opcodes.INVOKESTATIC : Opcodes.INVOKEVIRTUAL;
 
         int varIdx = 0;
-
-        if (insn == Opcodes.INVOKEVIRTUAL) {
-            mv.visitVarInsn(Opcodes.ALOAD, varIdx++);
-        }
 
         for (Type argumentType : type.getArgumentTypes()) {
             load(mv, argumentType, varIdx++);

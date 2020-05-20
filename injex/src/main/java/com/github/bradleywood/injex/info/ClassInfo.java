@@ -3,10 +3,8 @@ package com.github.bradleywood.injex.info;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
 import org.objectweb.asm.ClassReader;
 
-import java.lang.annotation.ElementType;
 import java.util.List;
 
 @Data
@@ -18,6 +16,7 @@ public class ClassInfo extends InjexElement {
     private List<InjexField> fields;
     private List<InjexMethod> methods;
     private ClassReader reader;
+    private boolean replaceInstantiation = false;
 
     private ClassInfo() {
     }
