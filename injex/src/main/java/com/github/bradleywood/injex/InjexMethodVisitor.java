@@ -57,7 +57,7 @@ public class InjexMethodVisitor extends MethodVisitor {
 
         if (Type.getType(Copy.class).equals(type) || Type.getType(Inject.class).equals(type) ||
                 Type.getType(Replace.class).equals(type) || Type.getType(HookBefore.class).equals(type) ||
-                Type.getType(HookAfter.class).equals(type)) {
+                Type.getType(HookAfter.class).equals(type) || Type.getType(Replace.class).equals(type)) {
             return null;
         }
 

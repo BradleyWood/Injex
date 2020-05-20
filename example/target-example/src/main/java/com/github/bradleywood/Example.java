@@ -37,6 +37,6 @@ public class Example {
     }
 
     public static void main(String[] args) {
-        System.out.println("Output=" + hookAfterMe(50, 25));
+        System.out.println("Output=" + copyMe());
     }
 }

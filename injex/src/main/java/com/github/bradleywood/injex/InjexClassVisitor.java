@@ -65,7 +65,20 @@ public class InjexClassVisitor extends ClassVisitor {
         } else if (!shouldInject(name, descriptor))
             return null;
 
+        final List<InjexMethod> replacements = getTargets(name, descriptor, AlterationType.REPLACE);
+
+        if (!replacements.isEmpty() && replacements.size() > 1) {
+            throw new RuntimeException("Cannot replace method more than once");
+        } else if (!replacements.isEmpty()) {
+            name = replacements.get(0).getTarget();
+            return super.visitMethod(access, name, descriptor, signature, exceptions);
+        }
+
         final InjexMethod target = getTarget(name, descriptor);
+
+        if (target != null && target.getType() == AlterationType.COPY) {
+            name = target.getName();
+        }
 
         final MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
