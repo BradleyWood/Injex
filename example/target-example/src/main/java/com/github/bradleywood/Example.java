@@ -1,5 +1,8 @@
 package com.github.bradleywood;
 
+import java.io.IOException;
+import java.net.Socket;
+
 public class Example {
 
     static {
@@ -32,11 +35,23 @@ public class Example {
         }
     }
 
+    public static Socket getSocket(String address, int port) throws IOException {
+        return new Socket(address, port);
+    }
+
+    public static void hookBeforeAndAfter() {
+        System.out.println("Hello World!");
+    }
+
     public Example() {
         System.out.println("Me neither!");
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         System.out.println("Output=" + copyMe());
+        System.out.println("HookAfterMe: " + hookAfterMe((int)(copyMe() * 1000), (int)(copyMe() * 1000)));
+
+        final Socket socket = getSocket("localhost", 1234);
+        System.out.println(socket.isConnected());
     }
 }

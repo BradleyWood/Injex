@@ -21,6 +21,12 @@ public class Example {
         return a + b;
     }
 
+    @HookAfter("hookBeforeAndAfter")
+    @HookBefore("hookBeforeAndAfter")
+    public static void hookTest() {
+        System.out.println("Hook!");
+    }
+
     @Copy("copyMe")
     public static double copy$copyMe() {
         throw new RuntimeException();

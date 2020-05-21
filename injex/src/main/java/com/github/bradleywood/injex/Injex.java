@@ -1,11 +1,18 @@
 package com.github.bradleywood.injex;
 
-import com.github.bradleywood.injex.info.ClassInfo;
+import com.github.bradleywood.injex.annotations.InjexTarget;
+import com.github.bradleywood.injex.annotations.ReplaceInstantiation;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.reflect.ClassPath;
 import lombok.Data;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
 
 import java.io.*;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -24,52 +31,68 @@ public class Injex {
         final Map<String, InputStream> srcEntries = getClassEntries(srcJar);
         final Map<String, InputStream> targetEntries = getClassEntries(targetJar);
 
-        final List<ClassInfo> readers = srcEntries.values().stream().map(e -> {
+        final List<ClassNode> sourceClassNodes = srcEntries.values().stream().map(e -> {
             try {
-                return ClassInfo.getClassInfo(new ClassReader(e));
+                return getClassNode(new ClassReader(e));
             } catch (IOException ioException) {
             }
             return null;
         }).filter(Objects::nonNull).collect(Collectors.toList());
 
-        List<ClassReader> targetReaders = targetEntries.values().stream().map(e -> {
+        final List<ClassNode> targetClassNodes = targetEntries.values().stream().map(e -> {
             try {
-                return new ClassReader(e);
+                return getClassNode(new ClassReader(e));
             } catch (IOException ioException) {
             }
             return null;
         }).collect(Collectors.toList());
 
+        final Map<ClassNode, ClassNode> pairings = pairClasses(sourceClassNodes, targetClassNodes);
+        final Map<String, String> typesToReplace = getTypesToReplace(sourceClassNodes);
+        final InjexVisitor visitor = new DecoratedInjexVisitor(getVisitors());
+        final List<ClassNode> results = new LinkedList<>();
 
-        final Map<ClassInfo, ClassReader> pairs = pairClasses(readers, targetReaders);
-        final List<ClassInfo> replacementTypes = getReplacementTypes(readers);
+        pairings.forEach((src, target) -> {
+            final InjexPairing pairing = new InjexPairing(src, target, typesToReplace);
+            pairing.accept(visitor);
+            results.add(pairing.getResult());
+        });
+
         final ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(outputJar));
 
-        pairs.forEach((clazz, reader) -> {
+        results.forEach((node) -> {
             final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-            final InjexClassVisitor injexVisitor = new InjexClassVisitor(replacementTypes, clazz, writer, reader.getClassName());
+            node.accept(writer);
 
-            reader.accept(injexVisitor, 0);
+            final byte[] bytes = writer.toByteArray();
 
             try {
-                if (!clazz.isReplaceInstantiation()) {
-                    zos.putNextEntry(new ZipEntry(reader.getClassName() + ".class"));
-                    zos.write(writer.toByteArray());
-                    zos.closeEntry();
-                }
+                zos.putNextEntry(new ZipEntry(node.name + ".class"));
+                zos.write(bytes);
+                zos.closeEntry();
             } catch (Exception e) {
                 e.printStackTrace();
             }
         });
 
-        for (ClassInfo replacementType : replacementTypes) {
-            final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-            replacementType.getReader().accept(writer, 0);
+        typesToReplace.values().forEach(type -> {
+            for (final ClassNode sourceClassNode : sourceClassNodes) {
+                if (sourceClassNode.name.equals(type)) {
+                    final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                    sourceClassNode.accept(writer);
 
-            zos.putNextEntry(new ZipEntry(replacementType.getName()+ ".class"));
-            zos.write(writer.toByteArray());
-            zos.closeEntry();
-        }
+                    final byte[] bytes = writer.toByteArray();
+
+                    try {
+                        zos.putNextEntry(new ZipEntry(sourceClassNode.name + ".class"));
+                        zos.write(bytes);
+                        zos.closeEntry();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
 
         fileEntries.forEach((name, in) -> {
             try {
@@ -84,6 +107,13 @@ public class Injex {
         zos.close();
     }
 
+    private ClassNode getClassNode(final ClassReader reader) {
+        final ClassNode node = new ClassNode(Opcodes.ASM8);
+        reader.accept(node, 0);
+
+        return node;
+    }
+
     private static void copyInToOut(final InputStream in, final OutputStream out) throws IOException {
         byte[] buff = new byte[1024];
         int len;
@@ -93,17 +123,49 @@ public class Injex {
         }
     }
 
-    private static List<ClassInfo> getReplacementTypes(final List<ClassInfo> srcReaders) {
-        return srcReaders.stream().filter(ClassInfo::isReplaceInstantiation).collect(Collectors.toList());
+    private static Map<String, String> getTypesToReplace(final List<ClassNode> nodes) {
+        final Map<String, String> map = new HashMap<>();
+
+        for (final ClassNode node : nodes) {
+            String target = getTarget(node, ReplaceInstantiation.class);
+
+            if (target != null) {
+                map.put(target, node.name);
+            }
+        }
+
+        return map;
     }
 
-    private static Map<ClassInfo, ClassReader> pairClasses(final List<ClassInfo> srcReaders, List<ClassReader> targetReaders) {
-        final Map<ClassInfo, ClassReader> pairs = new HashMap<>();
+    private static List<InjexVisitor> getVisitors() throws IOException {
+        final List<InjexVisitor> visitors = new LinkedList<>();
 
-        for (final ClassInfo ci : srcReaders) {
-            if (ci.getTarget() != null) {
-                for (final ClassReader targetReader : targetReaders) {
-                    if (ci.getTarget().replace(".", "/").equals(targetReader.getClassName())) {
+        final ImmutableSet<ClassPath.ClassInfo> topLevelClassesRecursive = ClassPath.from(Injex.class.getClassLoader())
+                .getTopLevelClassesRecursive("com.github.bradleywood.injex.adaptors");
+
+        topLevelClassesRecursive.stream().map(ClassPath.ClassInfo::getName).forEach(c -> {
+            try {
+                Class<?> clazz = Class.forName(c);
+                if (InjexVisitor.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
+                    visitors.add((InjexVisitor) clazz.newInstance());
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+
+        return visitors;
+    }
+
+    private static Map<ClassNode, ClassNode> pairClasses(final List<ClassNode> srcReaders, List<ClassNode> targetReaders) {
+        final Map<ClassNode, ClassNode> pairs = new HashMap<>();
+
+        for (final ClassNode ci : srcReaders) {
+            String target = getTarget(ci, InjexTarget.class);
+
+            if (target != null) {
+                for (final ClassNode targetReader : targetReaders) {
+                    if (target.equals(targetReader.name)) {
                         pairs.put(ci, targetReader);
                     }
                 }
@@ -111,6 +173,25 @@ public class Injex {
         }
 
         return pairs;
+    }
+
+    private static String getTarget(final ClassNode ci, final Class<?> annotationType) {
+        List<String> types = ci.visibleAnnotations.stream()
+                .filter(n -> n.desc.equals(Type.getDescriptor(annotationType)))
+                .map(n -> n.values)
+                .filter(v -> v.size() == 2)
+                .map(v -> v.get(1))
+                .map(v -> {
+                    if (v instanceof Type)
+                        return ((Type) v).getInternalName();
+                    else
+                        return v.toString();
+                }).collect(Collectors.toList());
+
+        if (types.size() != 1)
+            return null;
+
+        return types.get(0).replace(".", "/");
     }
 
     private static Map<String, InputStream> getClassEntries(final File file) throws IOException {
