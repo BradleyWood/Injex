@@ -26,6 +26,10 @@ public class HookMethodVisitor extends MethodVisitor {
 
         int varIdx = 0;
 
+        if (insn == Opcodes.INVOKEVIRTUAL) {
+            mv.visitVarInsn(Opcodes.ALOAD, varIdx++);
+        }
+
         for (Type argumentType : type.getArgumentTypes()) {
             load(mv, argumentType, varIdx++);
         }
