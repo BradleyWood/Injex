@@ -22,8 +22,8 @@ public class HandleExtends implements ClassAnnotationHandler {
         Object value = values.get(1);
 
         if (value instanceof Type)
-            return ((Type) value).getDescriptor();
+            return ((Type) value).getInternalName();
 
-        return value.toString();
+        return value.toString().replace(".", "/");
     }
 }
