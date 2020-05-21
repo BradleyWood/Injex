@@ -2,6 +2,7 @@ package com.github.bradleywood.injex;
 
 import lombok.NonNull;
 import lombok.AllArgsConstructor;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -53,6 +54,13 @@ public class DecoratedInjexVisitor implements InjexVisitor {
     public void visitHook(final MethodNode methodToHook, final MethodNode methodToCall, final String owner, final boolean before) {
         for (final InjexVisitor visitor : visitors) {
             visitor.visitHook(methodToHook, methodToCall, owner, before);
+        }
+    }
+
+    @Override
+    public void visitClassAnnotation(final ClassNode targetClass, final AnnotationNode annotationNode) {
+        for (final InjexVisitor visitor : visitors) {
+            visitor.visitClassAnnotation(targetClass, annotationNode);
         }
     }
 }

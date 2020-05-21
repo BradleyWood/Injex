@@ -1,5 +1,6 @@
 package com.github.bradleywood.injex;
 
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -18,5 +19,7 @@ public interface InjexVisitor {
     void visitInstantiationReplacement(MethodNode method, Map<String, String> typesToReplace);
 
     void visitHook(MethodNode methodToHook, MethodNode methodToCall, String owner, boolean before);
+
+    void visitClassAnnotation(ClassNode targetClass, AnnotationNode annotationNode);
 
 }

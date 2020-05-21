@@ -1,6 +1,7 @@
 package com.github.bradleywood.injex.adaptors;
 
 import com.github.bradleywood.injex.InjexVisitor;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -35,6 +36,11 @@ public abstract class AbstractInjexVisitor implements InjexVisitor {
 
     @Override
     public void visitHook(MethodNode methodToHook, MethodNode methodToCall, String owner, boolean before) {
+
+    }
+
+    @Override
+    public void visitClassAnnotation(ClassNode targetClass, AnnotationNode annotationNode) {
 
     }
 }

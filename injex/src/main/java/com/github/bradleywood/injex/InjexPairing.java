@@ -92,6 +92,14 @@ public class InjexPairing {
         for (final MethodNode method : targetNode.methods) {
             visitor.visitInstantiationReplacement(method, typesToReplace);
         }
+
+        if (srcNode.visibleAnnotations != null) {
+            for (final AnnotationNode visibleAnnotation : srcNode.visibleAnnotations) {
+                if (!Type.getType(ReplaceInstantiation.class).equals(Type.getType(visibleAnnotation.desc))) {
+                    visitor.visitClassAnnotation(targetNode, visibleAnnotation);
+                }
+            }
+        }
     }
 
     private static String getCopyMethodName(final MethodNode node) {
