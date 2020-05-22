@@ -111,6 +111,33 @@ public class InjexPairing {
             }
         }
 
+        for (final MethodNode method : srcNode.methods) {
+            final AnnotationNode annotationNode = getAnnotationByType(method, InlineHookAt.class);
+
+            if (annotationNode != null) {
+                final List<Object> values = annotationNode.values;
+                final String target = getAnnotationValueOrDefault(annotationNode, "value", null);
+                final String desc = getAnnotationValueOrDefault(annotationNode, "desc", "()V");
+                final Integer line = getAnnotationValueOrDefault(annotationNode, "line", 0);
+
+                final MethodNode targetMethod = findMethod(targetNode.methods, target, desc);
+
+                if (target == null) {
+                    throw new RuntimeException("Must provided target method name");
+                }
+
+                if (!Type.getReturnType(method.desc).equals(Type.VOID_TYPE)) {
+                    throw new RuntimeException("Inline injected methods must return void");
+                }
+
+                if (targetMethod != null) {
+                    visitor.visitInjectAtLine(method, targetMethod, line);
+                } else {
+                    throw new RuntimeException("Target method not found: " + target + " " + desc);
+                }
+            }
+        }
+
         for (final MethodNode method : targetNode.methods) {
             visitor.visitInstantiationReplacement(method, typesToReplace);
         }
@@ -128,6 +155,17 @@ public class InjexPairing {
                 }
             }
         }
+    }
+
+    private static <T> T getAnnotationValueOrDefault(final AnnotationNode node, final Object key, final T defaultValue) {
+        List<Object> values = node.values;
+        for (int i = 0; i < node.values.size(); i += 2) {
+            if (values.get(i).equals(key)) {
+                return (T) values.get(i + 1);
+            }
+        }
+
+        return defaultValue;
     }
 
     private static String getCopyMethodName(final MethodNode node) {
@@ -183,6 +221,19 @@ public class InjexPairing {
         }
 
         return fieldsToReplace;
+    }
+
+    private static AnnotationNode getAnnotationByType(final MethodNode methodNode, final Class<?> annotationType) {
+        if (methodNode.visibleAnnotations == null)
+            return null;
+
+        for (final AnnotationNode visibleAnnotation : methodNode.visibleAnnotations) {
+            if (Type.getType(annotationType).equals(Type.getType(visibleAnnotation.desc))) {
+                return visibleAnnotation;
+            }
+        }
+
+        return null;
     }
 
     private static String getTarget(final MethodNode node, final Class<?> annotationType) {

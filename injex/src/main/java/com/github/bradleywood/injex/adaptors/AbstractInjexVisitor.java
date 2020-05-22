@@ -57,6 +57,11 @@ public abstract class AbstractInjexVisitor implements InjexVisitor {
     }
 
     @Override
+    public void visitInjectAtLine(MethodNode srcMethod, MethodNode destMethod, int lineNumber) {
+
+    }
+
+    @Override
     public void visitMerge(MethodNode srcNode, MethodNode destNode) {
 
     }

@@ -30,4 +30,6 @@ public interface InjexVisitor {
 
     void visitMerge(MethodNode srcNode, MethodNode destNode);
 
+    void visitInjectAtLine(MethodNode srcMethod, MethodNode destMethod, int lineNumber);
+
 }

@@ -85,4 +85,11 @@ public class DecoratedInjexVisitor implements InjexVisitor {
             visitor.visitMerge(srcNode, destNode);
         }
     }
+
+    @Override
+    public void visitInjectAtLine(final MethodNode srcMethod, final MethodNode destMethod, final int lineNumber) {
+        for (final InjexVisitor visitor : visitors) {
+            visitor.visitInjectAtLine(srcMethod, destMethod, lineNumber);
+        }
+    }
 }
