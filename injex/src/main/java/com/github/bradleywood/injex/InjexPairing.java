@@ -5,8 +5,10 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -87,10 +89,36 @@ public class InjexPairing {
             }
         }
 
+        for (final FieldNode field : srcNode.fields) {
+            if (shouldInject(field)) {
+                visitor.visitFieldInjection(targetNode, field, srcNode.name);
+            }
+        }
+
         visitor.visitPairing(srcNode, targetNode);
+
+        // merge class initializers so that injected fields can be initialized
+        // if they their type is non-primitive or string
+        // these types cannot be stored in the constant pool
+        final MethodNode srcInitializer = findMethod(srcNode.methods, "<clinit>", "()V");
+        final MethodNode destInitializer = findMethod(targetNode.methods, "<clinit>", "()V");
+
+        if (srcInitializer != null) {
+            if (destInitializer == null) {
+                visitor.visitInjection(srcInitializer, targetNode);
+            } else {
+                visitor.visitMerge(srcInitializer, destInitializer);
+            }
+        }
 
         for (final MethodNode method : targetNode.methods) {
             visitor.visitInstantiationReplacement(method, typesToReplace);
+        }
+
+        final List<String> fieldsToReplace = getFieldsToReplace(srcNode.fields);
+
+        for (final MethodNode method : targetNode.methods) {
+            visitor.visitFieldReplacement(method, fieldsToReplace);
         }
 
         if (srcNode.visibleAnnotations != null) {
@@ -118,6 +146,18 @@ public class InjexPairing {
         return getTarget(node, Replace.class);
     }
 
+    private static boolean shouldInject(final FieldNode node) {
+        if (node.visibleAnnotations == null)
+            return false;
+
+        for (AnnotationNode visibleAnnotation : node.visibleAnnotations) {
+            if (Type.getType(Inject.class).equals(Type.getType(visibleAnnotation.desc)))
+                return true;
+        }
+
+        return false;
+    }
+
     private static boolean shouldInject(final MethodNode node) {
         if (node.visibleAnnotations == null)
             return false;
@@ -128,6 +168,21 @@ public class InjexPairing {
         }
 
         return false;
+    }
+
+    private static List<String> getFieldsToReplace(final List<FieldNode> fieldList) {
+        final List<String> fieldsToReplace = new LinkedList<>();
+
+        for (final FieldNode fieldNode : fieldList) {
+            for (AnnotationNode visibleAnnotation : fieldNode.visibleAnnotations) {
+                if (Type.getType(Inject.class).equals(Type.getType(visibleAnnotation.desc)) ||
+                        Type.getType(Shadow.class).equals(Type.getType(visibleAnnotation.desc))) {
+                    fieldsToReplace.add(fieldNode.name);
+                }
+            }
+        }
+
+        return fieldsToReplace;
     }
 
     private static String getTarget(final MethodNode node, final Class<?> annotationType) {

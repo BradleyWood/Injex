@@ -6,7 +6,7 @@ import org.objectweb.asm.tree.MethodNode;
 
 import static com.github.bradleywood.injex.InjexUtil.findMethod;
 
-public class InjexCopy extends AbstractInjexVisitor {
+public class InjexCopyVisitor extends AbstractInjexVisitor {
 
     @Override
     public void visitCopy(final ClassNode node, final String desc, final String originalName, final String newName) {

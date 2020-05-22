@@ -4,6 +4,7 @@ import lombok.NonNull;
 import lombok.AllArgsConstructor;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.List;
@@ -58,9 +59,30 @@ public class DecoratedInjexVisitor implements InjexVisitor {
     }
 
     @Override
+    public void visitFieldInjection(final ClassNode targetClass, final FieldNode fieldNode, final String originalOwner) {
+        for (final InjexVisitor visitor : visitors) {
+            visitor.visitFieldInjection(targetClass, fieldNode, originalOwner);
+        }
+    }
+
+    @Override
+    public void visitFieldReplacement(final MethodNode methodNode, final List<String> fields) {
+        for (final InjexVisitor visitor : visitors) {
+            visitor.visitFieldReplacement(methodNode, fields);
+        }
+    }
+
+    @Override
     public void visitClassAnnotation(final ClassNode targetClass, final AnnotationNode annotationNode) {
         for (final InjexVisitor visitor : visitors) {
             visitor.visitClassAnnotation(targetClass, annotationNode);
+        }
+    }
+
+    @Override
+    public void visitMerge(final MethodNode srcNode, final MethodNode destNode) {
+        for (final InjexVisitor visitor : visitors) {
+            visitor.visitMerge(srcNode, destNode);
         }
     }
 }
