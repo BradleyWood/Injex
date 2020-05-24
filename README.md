@@ -43,6 +43,27 @@ Annotations are to be used to accomplish the following tasks
  - Replace instantiation operations of certain types with @ReplaceInstantiation
  - Inject code into a method at a specific line with @InlineHookAt
 
+### @Inject
+
+The @Inject annotation may be applied to both fields and methods. Its job
+is to inject the entity into the target class.
+
+### @Replace
+The @Replace annotation is used to replace a method in the target class.
+A method annotated with @Replace must have the same method descriptor as
+the method it wishes to replace. The method may have a different name than
+as defined in the target class.
+
+#### Example
+
+```java
+@Replace("replaceMe")
+public static void replaceMe() {
+    System.out.println("You have been replaced!");
+}
+```
+
+
 ### @InlineHookAt
 
 This annotation allows you to inject code into a target method
